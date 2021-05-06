@@ -447,6 +447,110 @@ static int handle_devlist_import_cmd(int sockfd, const char* session_id)
 
 	return ret;
 }
+/*
+	NAT方式
+	处理8005,8003
+ */
+
+static int handle_8005_8003(int sockfd, const char* session_id)
+{
+	int terminate = 0;
+	fd_set fd_r;
+	int ret = 0;
+	int result = 0;
+	uint16_t wait_req_code = OP_REQ_DEVLIST;
+
+	if (sockfd < 0) {
+		return -1;
+	}
+
+	while (!terminate)
+	{
+		FD_ZERO(&fd_r);
+		FD_SET(sockfd, &fd_r);
+
+		info("[socket:%d] wait recv 0x%04x request, &%s", sockfd, wait_req_code, session_id);
+		ret = select(sockfd + 1, &fd_r, NULL, NULL, NULL);
+		if (ret < 0) //出错
+		{
+			if (errno == EINTR) {
+				info("[socket:%d] select signal interrupt, &%s", sockfd, session_id); //select阻塞被信号中断
+				continue;
+			}
+			err("[socket:%d] Failed to select: %s, &%s", sockfd, strerror(errno), session_id);
+			terminate = 1;
+			ret = -1;
+		}
+		else if (ret == 0) //超时
+		{
+			err("[socket:%d] Wait 0x%04x request timeout, &%s", sockfd, wait_req_code, session_id);
+			terminate = 1;
+			ret = -1;
+		}
+		else
+		{
+			if (FD_ISSET(sockfd, &fd_r))
+			{
+				result = recv_pdu_ex(sockfd, session_id);
+				switch (result)
+				{
+				case COMPLETED_8005_REQ:
+					wait_req_code = OP_REQ_IMPORT;
+					break;
+				case COMPLETED_8003_REQ:
+					terminate = 1; //8005 8003处理完成，退出
+					break;
+				default:
+					err("######[socket:%d] Failed to handle %#0x request######, &%s", sockfd, wait_req_code, session_id);
+					ret = -1;
+					terminate = 1;
+				}
+			}
+		}
+	}
+
+	return ret;
+
+}
+//端口转发模式
+static int  do_port_forwarding_mode(int agent_connfd, USB_AGENT_OPEN_PORT_CMD* info)
+{
+	int sockfd = -1;
+	int ret;
+	USBIPD_AGENT_COMMU_RSP reply;
+
+	uint16_t port = atoi(info->server_port);
+
+	info("[socket:%d] start port forwarding mode, &%s", (int)getpid(), info->session_id);
+	memset(&reply, 0, sizeof(USBIPD_AGENT_COMMU_RSP));
+	strcpy(reply.version, USBIPD_AGENT_COMMU_VERSION);
+	reply.cmd = OPEN_PORT_REPLY;
+	reply.data_len = sizeof(USBIPD_AGENT_COMMU_RSP);
+	reply.result = SUCCESS_REPLY_CODE;
+
+	sockfd = connect_to_extranet(info->proxy_server_addr, port);
+	if (sockfd < 0)
+	{
+		info("");
+		err("######[socket: %d] Failed to connect to  extranet server(%s:%d): %s ####### &%s", (int)getpid(), info->proxy_server_addr, port, strerror(errno), info->session_id);
+		info("");
+		reply.result = FAILED_REPLY_CODE;
+		send_reply_msg_to_agent_process(agent_connfd, &reply);
+		return -1;
+	}
+
+	ret = handle_8005_8003(sockfd, info->session_id);
+	if (ret < 0) {
+		err("[socket:%d] handle 8005_8003 failed, &%s", (int)getpid(), info->session_id);
+		close(sockfd);
+		reply.result = FAILED_REPLY_CODE;
+		send_reply_msg_to_agent_process(agent_connfd, &reply);
+		return -1;
+	}
+	send_reply_msg_to_agent_process(agent_connfd, &reply);
+
+	return 0;
+}
 //转发服务模式
 static int  do_tran_server_mode(int agent_connfd, USB_AGENT_OPEN_PORT_CMD* info)
 {
