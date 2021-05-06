@@ -159,13 +159,16 @@
     <ClCompile Include="usbipd_accept.c" />
     <ClCompile Include="usbipd_import.c" />
     <ClCompile Include="usbipd_list.c" />
+    <ClCompile Include="usbipd_proxy.c" />
     <ClCompile Include="usbipd_sock.c" />
     <ClCompile Include="usbipd_stub.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\config.h" />
     <ClInclude Include="usbipd.h" />
+    <ClInclude Include="usbipd_proxy.h" />
     <ClInclude Include="usbipd_stub.h" />
+    <ClInclude Include="usb_agent_commu.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\lib\usbip_common.vcxproj">

@@ -21,7 +21,24 @@ extern char *usbip_port_string;
 void usbip_setup_port_number(char *arg);
 
 #pragma pack(push,1)
+//TODO 改成正确的值
+#define SYSFS_BUS_ID_SIZE 10
+/*-----------------------------------------------------------------*/
+#define OP_REQ_DEVLIST_EX  0x9005
+struct op_devlist_request_ex {
+	char  clientid[64];
+	char  busid[SYSFS_BUS_ID_SIZE];
+	char  session_id[128];
+	char  reserve[128]; //预留128个字节数据
+};
 
+#define OP_REQ_IMPORT_EX   0x9003
+struct op_import_request_ex {
+	char  clientid[64];
+	char  busid[SYSFS_BUS_ID_SIZE];
+	char  session_id[128];
+	char  reserve[128]; //预留128个字节数据
+};
 /* ---------------------------------------------------------------------- */
 /* Common header for all the kinds of PDUs. */
 struct op_common {

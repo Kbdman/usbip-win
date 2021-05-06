@@ -135,3 +135,22 @@ recv_request_devlist(SOCKET connfd)
 
 	return 0;
 }
+int recv_request_devlist_ex(int connfd, struct op_devlist_request_ex* req)
+{
+	int rc;
+
+	rc = usbip_net_recv(connfd, req, sizeof(struct op_devlist_request_ex));
+	if (rc < 0) {
+		err("usbip_net_recv failed: recv 0x9005 error: %s", strerror(errno));
+		return -1;
+	}
+
+	rc = send_reply_devlist(connfd);
+	if (rc < 0) {
+		err("send_reply_devlist failed, &%s", req->session_id);
+		return -1;
+	}
+
+	return 0;
+}
+

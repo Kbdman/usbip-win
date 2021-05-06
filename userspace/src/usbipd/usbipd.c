@@ -50,6 +50,7 @@ static const char usbipd_help_string[] =
 
 static enum {
 	cmd_standalone_mode = 1,
+	cmd_proxy_server_mode,
 	cmd_help,
 	cmd_version
 } cmd = cmd_standalone_mode;
@@ -85,7 +86,32 @@ setup_fds(SOCKET *sockfds, fd_set *pfds)
 	}
 	return i;
 }
+static int do_proxy_mode(void)
+{   
+	//TODO 检查驱动是否正常
+	/*
+	if (usbip_host_driver_open()) {
+		err("please load " USBIP_CORE_MOD_NAME ".ko and "USBIP_HOST_DRV_NAME ".ko!");
+		return -1;
+	}
 
+	if (daemonize) {
+		if (daemon(0, 0) < 0) {
+			err("daemonizing failed: %s", strerror(errno));
+			usbip_host_driver_close();
+			return -1;
+		}
+		umask(0);
+		usbip_use_syslog = 1;
+	}
+	*/
+	set_signal();
+
+	start_usbipd_client_mode();
+
+
+	return 0;
+}
 static int
 do_standalone_mode(void)
 {
@@ -207,6 +233,8 @@ main(int argc, char *argv[])
 	switch (cmd) {
 	case cmd_standalone_mode:
 		return do_standalone_mode();
+	case cmd_proxy_server_mode:
+		return do_proxy_mode();
 	case cmd_version:
 		printf(PROGNAME " (%s)\n", usbip_version_string);
 		return EXIT_SUCCESS;

@@ -310,3 +310,4 @@ SOCKET usbip_net_tcp_connect(const char *hostname, const char *port)
 
 	return sockfd;
 }
+
