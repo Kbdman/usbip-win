@@ -48,7 +48,7 @@ get_speed_from_bcdUSB(USHORT bcdUSB)
 }
 
 static NTSTATUS
-process_get_devinfo(usbip_stub_dev_t *devstub, IRP *irp)
+process_get_devinfo(usbip_stub_dev_t* devstub, IRP* irp)
 {
 	PIO_STACK_LOCATION	irpStack;
 	ULONG	outlen;
@@ -64,9 +64,9 @@ process_get_devinfo(usbip_stub_dev_t *devstub, IRP *irp)
 		USB_DEVICE_DESCRIPTOR	desc;
 
 		if (get_usb_device_desc(devstub, &desc)) {
-			ioctl_usbip_stub_devinfo_t	*devinfo;
+			ioctl_usbip_stub_devinfo_t* devinfo;
 
-			devinfo = (ioctl_usbip_stub_devinfo_t *)irp->AssociatedIrp.SystemBuffer;
+			devinfo = (ioctl_usbip_stub_devinfo_t*)irp->AssociatedIrp.SystemBuffer;
 			devinfo->vendor = desc.idVendor;
 			devinfo->product = desc.idProduct;
 			devinfo->speed = get_speed_from_bcdUSB(desc.bcdUSB);
@@ -84,6 +84,95 @@ process_get_devinfo(usbip_stub_dev_t *devstub, IRP *irp)
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 	return status;
 }
+static NTSTATUS
+process_get_configinfo(usbip_stub_dev_t* devstub, IRP* irp)
+{
+
+	DBGI(DBG_IOCTL, "process_get_configinfo\n");
+	PIO_STACK_LOCATION	irpStack;
+	ULONG	outlen;
+	NTSTATUS	status = STATUS_SUCCESS;
+
+	irpStack = IoGetCurrentIrpStackLocation(irp);
+
+	outlen = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
+	irp->IoStatus.Information = 0;
+	if (outlen < sizeof(USB_CONFIGURATION_DESCRIPTOR) || irpStack->Parameters.DeviceIoControl.InputBufferLength < sizeof(ioctl_usbip_index_param))
+	{
+		DBGI(DBG_IOCTL, "process_get_configinfo %d,%d,%d,%d \n", outlen, sizeof(USB_CONFIGURATION_DESCRIPTOR), irpStack->Parameters.DeviceIoControl.InputBufferLength, sizeof(ioctl_usbip_index_param));
+		status = STATUS_INVALID_PARAMETER;
+	}
+	else {
+		UCHAR idx = ((ioctl_usbip_index_param*)(irp->AssociatedIrp.SystemBuffer))->index;
+		DBGI(DBG_IOCTL, "process_get_configinfo idx=%d \n", idx);
+		PUSB_CONFIGURATION_DESCRIPTOR conf_desc= get_usb_dsc_conf(devstub,idx);
+		if(conf_desc!=NULL){
+			DBGI(DBG_IOCTL, "conf_desc=%p", conf_desc);
+			RtlCopyMemory(irp->AssociatedIrp.SystemBuffer, conf_desc, sizeof(USB_CONFIGURATION_DESCRIPTOR));
+			ExFreePoolWithTag(conf_desc, USBIP_STUB_POOL_TAG);
+			irp->IoStatus.Information = sizeof(USB_CONFIGURATION_DESCRIPTOR);
+			DBGI(DBG_IOCTL, "free");
+		}
+		else {
+
+			DBGE(DBG_IOCTL, "process_get_configinfo get_usb_dsc_conf == NULL \n");
+			status = STATUS_UNSUCCESSFUL;
+		}
+	}
+	irp->IoStatus.Status = status;
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	return status;
+}
+
+static NTSTATUS
+process_get_interfaceinfo(usbip_stub_dev_t* devstub, IRP* irp)
+{
+
+	DBGI(DBG_IOCTL, "process_get_interfaceinfo\n");
+	PIO_STACK_LOCATION	irpStack;
+	ULONG	outlen;
+	NTSTATUS	status = STATUS_SUCCESS;
+
+	irpStack = IoGetCurrentIrpStackLocation(irp);
+
+	outlen = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
+	irp->IoStatus.Information = 0;
+	if (outlen < sizeof(USB_CONFIGURATION_DESCRIPTOR) || irpStack->Parameters.DeviceIoControl.InputBufferLength < sizeof(ioctl_usbip_index_param))
+	{
+		DBGI(DBG_IOCTL, "process_get_interfaceinfo %d,%d,%d,%d \n", outlen, sizeof(USB_CONFIGURATION_DESCRIPTOR), irpStack->Parameters.DeviceIoControl.InputBufferLength, sizeof(ioctl_usbip_index_param));
+		status = STATUS_INVALID_PARAMETER;
+	}
+	else {
+		UCHAR idx = ((ioctl_usbip_index_param*)(irp->AssociatedIrp.SystemBuffer))->index;
+		DBGI(DBG_IOCTL, "process_get_interfaceinfo idx=%d \n", idx);
+		PUSB_CONFIGURATION_DESCRIPTOR conf_desc = get_usb_dsc_conf(devstub, 1);
+		if (conf_desc != NULL) {
+			DBGI(DBG_IOCTL, "process_get_interfaceinfo get_default config=%p", conf_desc);
+			PUSB_INTERFACE_DESCRIPTOR intf_desc= dsc_find_intf(conf_desc, idx, 0);
+			if (intf_desc == NULL)
+			{
+				DBGE(DBG_IOCTL, "process_get_interfaceinfo dsc_find_intf == NULL \n");
+				status = STATUS_UNSUCCESSFUL;
+			}
+			else
+			{
+				RtlCopyMemory(irp->AssociatedIrp.SystemBuffer, conf_desc, sizeof(USB_CONFIGURATION_DESCRIPTOR));
+				ExFreePoolWithTag(conf_desc, USBIP_STUB_POOL_TAG);
+				irp->IoStatus.Information = sizeof(USB_CONFIGURATION_DESCRIPTOR);
+				DBGI(DBG_IOCTL, "free");
+			}
+		}
+		else {
+
+			DBGE(DBG_IOCTL, "process_get_interfaceinfo get_usb_dsc_conf == NULL \n");
+			status = STATUS_UNSUCCESSFUL;
+		}
+	}
+	irp->IoStatus.Status = status;
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	return status;
+}
+
 
 static NTSTATUS
 process_export(usbip_stub_dev_t *devstub, IRP *irp)
@@ -116,6 +205,10 @@ stub_dispatch_ioctl(usbip_stub_dev_t *devstub, IRP *irp)
 		return process_get_devinfo(devstub, irp);
 	case IOCTL_USBIP_STUB_EXPORT:
 		return process_export(devstub, irp);
+	case IOCTL_USBIP_STUB_GET_INTERFACEINFO:
+		return process_get_interfaceinfo(devstub, irp);
+	case IOCTL_USBIP_STUB_GET_CONFIGINFO:
+		return process_get_configinfo(devstub, irp);
 	default:
 		return pass_irp_down(devstub, irp, NULL, NULL);
 	}

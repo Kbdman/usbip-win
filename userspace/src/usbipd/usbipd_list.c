@@ -12,12 +12,17 @@ static int
 send_reply_devlist_devices(SOCKET connfd, struct list_head *pedev_list)
 {
 	struct list_head	*p;
-
+	struct usbip_usb_interface intf0;
 	list_for_each(p, pedev_list) {
 		edev_t	*edev;
 		int	rc;
 
 		edev = list_entry(p, edev_t, list);
+		BOOL got_intf0=build_interface(&edev->udev, &intf0, 0);
+		if (got_intf0 == TRUE)
+		{
+			edev->udev.bNumInterfaces = 1;
+		}
 		dump_usb_device(&edev->udev);
 		usbip_net_pack_usb_device(1, &edev->udev);
 
@@ -25,6 +30,15 @@ send_reply_devlist_devices(SOCKET connfd, struct list_head *pedev_list)
 		if (rc < 0) {
 			dbg("usbip_net_send failed: udev");
 			return -1;
+		}
+		if (got_intf0)
+		{
+			rc = usbip_net_send(connfd, &intf0, sizeof(intf0));
+			if (rc < 0)
+			{
+				dbg("usbip_net_send failed: interface,");
+				return -1;
+			}
 		}
 		/* usb interface count is always zero */
 	}

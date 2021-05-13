@@ -13,6 +13,8 @@
 
 #include <winsock2.h>
 #include <stdlib.h>
+#include <winusb.h>
+#include <usbspec.h>
 
 typedef struct {
 	const char	*id_inst;
@@ -143,7 +145,71 @@ is_stub_devno(devno_t devno)
 		return TRUE;
 	return FALSE;
 }
+static BOOL get_devconf(const char* devpath, PUSB_CONFIGURATION_DESCRIPTOR cfg, UCHAR index)
+{
+	dbg("get_devconf dev:%s idx: %d", devpath, index);
+	HANDLE	hdev;
+	DWORD	len;
+	ioctl_usbip_index_param req;
+	req.index = index;
+	hdev = CreateFile(devpath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+	if (hdev == INVALID_HANDLE_VALUE) {
+		dbg("get_devconf: cannot open device: %s", devpath);
+		return FALSE;
+	}
+	if (!DeviceIoControl(hdev, IOCTL_USBIP_STUB_GET_CONFIGINFO, &req, sizeof(ioctl_usbip_index_param), cfg, sizeof(USB_CONFIGURATION_DESCRIPTOR), &len, NULL)) {
+		dbg("get_devconf: DeviceIoControl failed: err: 0x%lx", GetLastError());
+		CloseHandle(hdev);
+		return FALSE;
+	}
+	CloseHandle(hdev);
 
+	if (len != sizeof(USB_CONFIGURATION_DESCRIPTOR)) {
+		dbg("get_devconf: DeviceIoControl failed: invalid size: len: %d", len);
+		return FALSE;
+	}
+	dbg("get_devconf config:%d, intf:%d ", cfg->iConfiguration, cfg->bNumInterfaces);
+	return TRUE;
+}
+static BOOL get_devintf(const char* devpath,PUSB_INTERFACE_DESCRIPTOR intfinfo,UCHAR index)
+{
+	dbg("get_interfaceinfo dev:%s idx: %d", devpath, index);
+	HANDLE	hdev;
+	DWORD	len;
+	ioctl_usbip_index_param req;
+	req.index = index;
+	hdev = CreateFile(devpath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+	if (hdev == INVALID_HANDLE_VALUE) {
+		dbg("get_interfaceinfo: cannot open device: %s", devpath);
+		return FALSE;
+	}
+	if (!DeviceIoControl(hdev, IOCTL_USBIP_STUB_GET_INTERFACEINFO, &req, sizeof(ioctl_usbip_index_param), intfinfo, sizeof(USB_INTERFACE_DESCRIPTOR), &len, NULL)) {
+		dbg("get_interfaceinfo: DeviceIoControl failed: err: 0x%lx", GetLastError());
+		CloseHandle(hdev);
+		return FALSE;
+	}
+	CloseHandle(hdev);
+
+	if (len != sizeof(USB_INTERFACE_DESCRIPTOR)) {
+		dbg("get_interfaceinfo: DeviceIoControl failed: invalid size: len: %d", len);
+		return FALSE;
+	}
+	dbg("get_interfaceinfo 0x%1x,0x%1x,0x%1x,0x%1x", intfinfo->bInterfaceClass,intfinfo->bInterfaceNumber,intfinfo->bInterfaceSubClass,intfinfo->bInterfaceProtocol);
+	return TRUE;
+}
+BOOL build_interface(struct usbip_usb_device* pudev, struct usbip_usb_interface* pinterface, int idx)
+{
+	USB_INTERFACE_DESCRIPTOR intf_desc;
+	//get_devconf(pudev->path, &intf_desc, idx);
+	if (TRUE == get_devintf(pudev->path, &intf_desc, 0))
+	{
+		pinterface->bInterfaceClass = intf_desc.bInterfaceClass;
+		pinterface->bInterfaceProtocol = intf_desc.bInterfaceProtocol;
+		pinterface->bInterfaceSubClass = intf_desc.bInterfaceSubClass;
+		return TRUE;
+	}
+	return FALSE;
+}
 BOOL
 build_udev(devno_t devno, struct usbip_usb_device *pudev)
 {
@@ -161,6 +227,7 @@ build_udev(devno_t devno, struct usbip_usb_device *pudev)
 	pudev->busnum = 1;
 	pudev->devnum = (int)devno;
 	snprintf(pudev->path, USBIP_DEV_PATH_MAX, devpath);
+	//打开设备,获取接口信息
 	snprintf(pudev->busid, USBIP_BUS_ID_SIZE, "1-%hhu", devno);
 
 	if (get_devinfo(devpath, &Devinfo)) {

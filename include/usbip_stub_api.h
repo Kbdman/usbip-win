@@ -16,6 +16,8 @@ DEFINE_GUID(GUID_DEVINTERFACE_STUB_USBIP,
 
 #define IOCTL_USBIP_STUB_GET_DEVINFO	USBIP_STUB_IOCTL(0x0)
 #define IOCTL_USBIP_STUB_EXPORT		USBIP_STUB_IOCTL(0x1)
+#define IOCTL_USBIP_STUB_GET_CONFIGINFO	USBIP_STUB_IOCTL(0x2)
+#define IOCTL_USBIP_STUB_GET_INTERFACEINFO	USBIP_STUB_IOCTL(0x3)
 
 #pragma pack(push,1)
 
@@ -28,5 +30,20 @@ typedef struct _ioctl_usbip_stub_devinfo
 	unsigned char	subclass;
 	unsigned char	protocol;
 } ioctl_usbip_stub_devinfo_t;
+
+typedef struct _ioctl_usbip_stub_interfaceinfo
+{
+	unsigned short	vendor;
+	unsigned short	product;
+	unsigned char	speed;
+	unsigned char	class;
+	unsigned char	subclass;
+	unsigned char	protocol;
+} ioctl_usbip_stub_interfaceinfo_t;
+
+typedef struct _ioctl_usbip_interface_request
+{
+	UCHAR index;
+} ioctl_usbip_index_param;
 
 #pragma pack(pop)

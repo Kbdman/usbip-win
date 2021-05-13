@@ -6,7 +6,8 @@
 #include "usb_util.h"
 
 BOOLEAN get_usb_status(usbip_stub_dev_t *devstub, USHORT op, USHORT idx, PVOID buff, PUCHAR plen);
-BOOLEAN get_usb_device_desc(usbip_stub_dev_t *devstub, PUSB_DEVICE_DESCRIPTOR pdesc);
+BOOLEAN get_usb_device_desc(usbip_stub_dev_t* devstub, PUSB_DEVICE_DESCRIPTOR pdesc);
+BOOLEAN get_usb_interface_desc(usbip_stub_dev_t* devstub, PUSB_INTERFACE_DESCRIPTOR pdesc, UCHAR idx);
 BOOLEAN get_usb_desc(usbip_stub_dev_t *devstub, UCHAR descType, UCHAR idx, USHORT idLang, PVOID buff, ULONG *pbufflen);
 
 BOOLEAN select_usb_conf(usbip_stub_dev_t *devstub, USHORT idx);
@@ -26,3 +27,6 @@ submit_iso_transfer(usbip_stub_dev_t *devstub, USBD_PIPE_HANDLE hPipe, unsigned 
 
 BOOLEAN
 submit_control_transfer(usbip_stub_dev_t *devstub, usb_cspkt_t *csp, PVOID data, PULONG pdata_len);
+
+PUSB_CONFIGURATION_DESCRIPTOR
+get_usb_dsc_conf(usbip_stub_dev_t* devstub, UCHAR bVal);

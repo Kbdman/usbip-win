@@ -191,7 +191,6 @@ parse_args(int argc, char *argv[])
 			ipv6 = TRUE;
 			break;
 		case 'd':
-			usbip_use_debug = 1;
 			break;
 		case 'h':
 			cmd = cmd_help;
@@ -226,7 +225,7 @@ main(int argc, char *argv[])
 {
 	usbip_progname = "usbipd";
 	usbip_use_stderr = 1;
-
+	usbip_use_debug = 1;
 	if (!parse_args(argc, argv))
 		return EXIT_FAILURE;
 

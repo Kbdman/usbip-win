@@ -62,6 +62,7 @@ recv_request_import(SOCKET sockfd)
 {
 	struct op_import_request req;
 	struct usbip_usb_device	udev;
+	struct usbip_usb_interface	intf0;
 	devno_t	devno;
 	int rc;
 
@@ -101,6 +102,9 @@ recv_request_import(SOCKET sockfd)
 	}
 
 	build_udev(devno, &udev);
+	BOOL got_intf0=build_interface(&udev, &intf0, 0);
+	if (got_intf0==TRUE)
+		udev.bNumInterfaces = 1;
 	usbip_net_pack_usb_device(1, &udev);
 
 	rc = usbip_net_send(sockfd, &udev, sizeof(udev));
@@ -108,7 +112,15 @@ recv_request_import(SOCKET sockfd)
 		dbg("usbip_net_send failed: devinfo");
 		return -1;
 	}
-
+	if (got_intf0)
+	{
+		rc = usbip_net_send(sockfd, &intf0, sizeof(intf0));
+		if (rc < 0)
+		{
+			dbg("usbip_net_send failed: interface");
+			return -1;
+		}
+	}
 	dbg("import request busid %s: complete", req.busid);
 
 	return 0;
@@ -118,6 +130,7 @@ int recv_request_import_ex(int sockfd, struct op_import_request_ex* req)
 	struct op_common reply;
 	struct usbip_exported_device* edev;
 	struct usbip_usb_device pdu_udev;
+	struct usbip_usb_interface intf0;
 	int found = 0;
 	int error = 0;
 	devno_t	devno;
@@ -139,7 +152,6 @@ int recv_request_import_ex(int sockfd, struct op_import_request_ex* req)
 		return -1;
 	}
 
-	if (found) {
 		/* should set TCP_NODELAY for usbip */
 		usbip_net_set_nodelay(sockfd);
 
@@ -149,11 +161,6 @@ int recv_request_import_ex(int sockfd, struct op_import_request_ex* req)
 		rc = export_device(devno, sockfd);
 		if (rc < 0)
 			error = 1;
-	}
-	else {
-		info("requested device not found: %s, &%s", req->busid, req->session_id);
-		error = 1;
-	}
 
 	rc = usbip_net_send_op_common(sockfd, OP_REP_IMPORT,
 		(!error ? ST_OK : ST_NA));
@@ -167,12 +174,24 @@ int recv_request_import_ex(int sockfd, struct op_import_request_ex* req)
 		return -1;
 	}
 	build_udev(devno, &pdu_udev);
+	BOOL got_intf0 = build_interface(&pdu_udev, &intf0, 0);
+	if(got_intf0==TRUE)
+		pdu_udev.bNumInterfaces = 1;
 	usbip_net_pack_usb_device(1, &pdu_udev);
-
+	build_interface(&pdu_udev, &intf0, 0);
 	rc = usbip_net_send(sockfd, &pdu_udev, sizeof(pdu_udev));
 	if (rc < 0) {
 		err("usbip_net_send failed: devinfo, &%s", req->session_id);
 		return -1;
+	}
+	if (got_intf0 == TRUE)
+	{
+		rc = usbip_net_send(sockfd, &intf0, sizeof(intf0));
+		if (rc < 0)
+		{
+			err("usbip_net_send failed: interface, &%s", req->session_id);
+			return -1;
+		}
 	}
 	info("import request busid %s: complete, &%s", req->busid, req->session_id);
 

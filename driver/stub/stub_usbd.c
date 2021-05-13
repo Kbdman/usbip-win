@@ -157,11 +157,15 @@ get_usb_desc(usbip_stub_dev_t *devstub, UCHAR descType, UCHAR idx, USHORT idLang
 {
 	URB		Urb;
 	NTSTATUS	status;
-
+	DBGI(DBG_IOCTL, "get_usb_desc  \n");
 	UsbBuildGetDescriptorRequest(&Urb, sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST), descType, idx, idLang, buff, NULL, *pbufflen, NULL);
 	status = call_usbd(devstub, &Urb);
+
+	DBGI(DBG_IOCTL, "get_usb_desc sta:%x \n", status);
 	if (NT_SUCCESS(status)) {
+
 		*pbufflen = Urb.UrbControlDescriptorRequest.TransferBufferLength;
+		DBGI(DBG_IOCTL, "get_usb_desc TransferBufferLength:%d \n", *pbufflen);
 		return TRUE;
 	}
 	return FALSE;
@@ -173,7 +177,13 @@ get_usb_device_desc(usbip_stub_dev_t* devstub, PUSB_DEVICE_DESCRIPTOR pdesc)
 	ULONG	len = sizeof(USB_DEVICE_DESCRIPTOR);
 	return get_usb_desc(devstub, USB_DEVICE_DESCRIPTOR_TYPE, 0, 0, pdesc, &len);
 }
-
+BOOLEAN
+get_usb_interface_desc(usbip_stub_dev_t* devstub, PUSB_INTERFACE_DESCRIPTOR pdesc, UCHAR idx)
+{
+	DBGI(DBG_IOCTL, "get_usb_interface_desc idx=%d \n", idx);
+	ULONG	len = sizeof(USB_INTERFACE_DESCRIPTOR);
+	return get_usb_desc(devstub, USB_INTERFACE_DESCRIPTOR_TYPE, idx, 0, pdesc, &len);
+}
 static INT
 find_usb_dsc_conf(usbip_stub_dev_t *devstub, UCHAR bVal, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf)
 {

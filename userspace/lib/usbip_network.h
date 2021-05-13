@@ -19,10 +19,9 @@
 extern int usbip_port;
 extern char *usbip_port_string;
 void usbip_setup_port_number(char *arg);
-
+#define SYSFS_PATH_MAX		256
+#define SYSFS_BUS_ID_SIZE	32
 #pragma pack(push,1)
-//TODO 改成正确的值
-#define SYSFS_BUS_ID_SIZE 10
 /*-----------------------------------------------------------------*/
 #define OP_REQ_DEVLIST_EX  0x9005
 struct op_devlist_request_ex {

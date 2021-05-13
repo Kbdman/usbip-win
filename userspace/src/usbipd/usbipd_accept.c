@@ -4,6 +4,7 @@
 
 #include "usbip_network.h"
 #include "usbipd_stub.h"
+#include "usbipd_proxy.h"
 
 static void
 recv_pdu(SOCKET connfd, BOOL *pneed_close_sockfd)
@@ -11,7 +12,8 @@ recv_pdu(SOCKET connfd, BOOL *pneed_close_sockfd)
 	uint16_t	code = OP_UNSPEC;
 	int	status;
 	int	ret;
-
+	struct op_devlist_request_ex req_devlist;
+	struct op_import_request_ex req_import;
 	*pneed_close_sockfd = TRUE;
 
 	ret = usbip_net_recv_op_common(connfd, &code, &status);
@@ -21,6 +23,7 @@ recv_pdu(SOCKET connfd, BOOL *pneed_close_sockfd)
 	}
 
 	switch (code) {
+
 	case OP_REQ_DEVLIST:
 		dbg("received request: %#0x - list devices", code);
 		ret = recv_request_devlist(connfd);
@@ -30,6 +33,20 @@ recv_pdu(SOCKET connfd, BOOL *pneed_close_sockfd)
 		ret = recv_request_import(connfd);
 		if (ret == 0)
 			*pneed_close_sockfd = FALSE;
+		break;
+	case OP_REQ_DEVLIST_EX:
+		ret = recv_request_devlist_ex(connfd, &req_devlist);
+		if (ret == 0) {
+			ret = COMPLETED_9005_REQ;
+			info("[socket:%d] Complete %#0x request", connfd, code);
+		}
+		break;
+	case OP_REQ_IMPORT_EX:
+		ret = recv_request_import_ex(connfd, &req_import);
+		if (ret == 0) {
+			ret = COMPLETED_9003_REQ;
+			info("[socket:%d] Complete %#0x request", connfd, code);
+		}
 		break;
 	case OP_REQ_DEVINFO:
 	case OP_REQ_CRYPKEY:
