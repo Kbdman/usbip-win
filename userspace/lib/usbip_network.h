@@ -75,6 +75,7 @@ struct op_common {
 #define OP_REP_IMPORT   (OP_REPLY   | OP_IMPORT)
 
 struct op_import_request {
+	char clientid[64];
 	char busid[USBIP_BUS_ID_SIZE];
 };
 

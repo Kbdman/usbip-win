@@ -45,6 +45,7 @@ recv_pdu(SOCKET connfd, BOOL *pneed_close_sockfd)
 		ret = recv_request_import_ex(connfd, &req_import);
 		if (ret == 0) {
 			ret = COMPLETED_9003_REQ;
+			*pneed_close_sockfd = FALSE;
 			info("[socket:%d] Complete %#0x request", connfd, code);
 		}
 		break;

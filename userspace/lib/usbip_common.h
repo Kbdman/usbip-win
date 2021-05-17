@@ -135,5 +135,4 @@ int usbip_names_init(void);
 void usbip_names_free(void);
 void usbip_names_get_product(char *buff, size_t size, uint16_t vendor, uint16_t product);
 void usbip_names_get_class(char *buff, size_t size, uint8_t class, uint8_t subclass, uint8_t protocol);
-
 #endif

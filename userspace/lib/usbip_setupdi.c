@@ -86,6 +86,7 @@ get_id_inst(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
 PSP_DEVICE_INTERFACE_DETAIL_DATA
 get_intf_detail(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, LPCGUID pguid)
 {
+
 	SP_DEVICE_INTERFACE_DATA	dev_interface_data;
 	PSP_DEVICE_INTERFACE_DETAIL_DATA	pdev_interface_detail;
 	unsigned long len = 0;

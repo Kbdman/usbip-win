@@ -41,8 +41,8 @@ typedef struct _devbuf {
  */
 static HANDLE	hEvent;
 
-#ifdef DEBUG_PDU
-#undef USING_STDOUT
+#ifndef DEBUG_PDU
+#define USING_STDOUT
 
 static void
 dbg_to_file(char *fmt, ...)
@@ -401,6 +401,8 @@ cleanup_devbuf(devbuf_t *buff)
 static VOID CALLBACK
 read_completion(DWORD errcode, DWORD nread, LPOVERLAPPED lpOverlapped)
 {
+
+	dbg("read got: %d\n", nread);
 	devbuf_t	*rbuff;
 
 	rbuff = (devbuf_t *)lpOverlapped->hEvent;
@@ -454,6 +456,8 @@ read_devbuf(devbuf_t *rbuff, DWORD nreq)
 	}
 
 	if (!rbuff->in_reading) {
+		dbg("try to read: %d\n", nreq);
+		dbg("header size: %ld\n", sizeof(struct usbip_header));
 		if (!ReadFileEx(rbuff->hdev, BUFCUR_P(rbuff), nreq, &rbuff->ovs[0], read_completion)) {
 			DWORD error = GetLastError();
 			dbg("failed to read: err: 0x%lx", error);
@@ -470,6 +474,8 @@ read_devbuf(devbuf_t *rbuff, DWORD nreq)
 static VOID CALLBACK
 write_completion(DWORD errcode, DWORD nwrite, LPOVERLAPPED lpOverlapped)
 {
+
+	dbg("written sock: %d", nwrite);
 	devbuf_t	*wbuff, *rbuff;
 
 	wbuff = (devbuf_t*)lpOverlapped->hEvent;
@@ -487,17 +493,28 @@ write_completion(DWORD errcode, DWORD nwrite, LPOVERLAPPED lpOverlapped)
 	rbuff = wbuff->peer;
 	rbuff->offc += nwrite;
 }
-
+/*
+* 将rbuff里的一个未写到wbuff设备的当前一个usbip_header以及相关数据给wbuff设备
+*/
 static BOOL
 write_devbuf(devbuf_t *wbuff, devbuf_t *rbuff)
 {
 	if (rbuff->bufp != rbuff->bufc && BUFREMAIN_C(rbuff) == 0) {
+		/*
+		* 在bufp和bufc不是一个时，且bufc写完时
+		* 释放bufc
+		* 将bufc指向bufp，将bufc的最大大小设置为当前bufp当前usbip_header指针前数据的大小
+		*/
 		free(rbuff->bufc);
 		rbuff->bufc = rbuff->bufp;
 		rbuff->offc = 0;
 		rbuff->bufmaxc = rbuff->offhdr;
 	}
 	if (!wbuff->in_writing && BUFREMAIN_C(rbuff) > 0) {
+		/*
+		* 如果不是正在写,且bufc有没写完的数据时，将这些数据写道文件中
+		*/
+		dbg("try to  write sock: %d", BUFREMAIN_C(rbuff));
 		if (!WriteFileEx(wbuff->hdev, BUFCUR_C(rbuff), BUFREMAIN_C(rbuff), &wbuff->ovs[1], write_completion)) {
 			dbg("failed to write sock: err: 0x%lx", GetLastError());
 			return FALSE;
@@ -507,14 +524,15 @@ write_devbuf(devbuf_t *wbuff, devbuf_t *rbuff)
 
 	return TRUE;
 }
-
+//读取一个usbip_header以及后续数据
 static int
 read_dev(devbuf_t *rbuff, BOOL swap_req_write)
 {
 	struct usbip_header	*hdr;
 	unsigned long	xfer_len, iso_len, len_data;
-
+	
 	if (BUFREAD_P(rbuff) < sizeof(struct usbip_header)) {
+		//如果usbip_header没有读完整继续读usbip头
 		rbuff->step_reading = 1;
 		if (!read_devbuf(rbuff, sizeof(struct usbip_header) - BUFREAD_P(rbuff)))
 			return -1;
@@ -523,23 +541,25 @@ read_dev(devbuf_t *rbuff, BOOL swap_req_write)
 
 	hdr = (struct usbip_header *)BUFHDR_P(rbuff);
 	if (rbuff->step_reading == 1) {
+		//如果在读usbip_header阶段,读完了头的数据，如果需要翻转字节序翻转字节序，进入读数据的接端
 		if (rbuff->swap_req)
 			swap_usbip_header_endian(hdr, TRUE);
 		rbuff->step_reading = 2;
 	}
-
+	//从头中获取传输的数据长度和iso descriptor的数据长度
 	xfer_len = get_xfer_len(rbuff->is_req, hdr);
 	iso_len = get_iso_len(rbuff->is_req, hdr);
 
 	len_data = xfer_len + iso_len;
 	if (BUFREAD_P(rbuff) < len_data + sizeof(struct usbip_header)) {
+		//如果没读完数据，继续读取，返回
 		DWORD	nmore = (DWORD)(len_data + sizeof(struct usbip_header)) - BUFREAD_P(rbuff);
 
 		if (!read_devbuf(rbuff, nmore))
 			return -1;
 		return 0;
 	}
-
+	//读完进行数据的字节序转换
 	if (rbuff->swap_req && iso_len > 0)
 		swap_iso_descs_endian((char *)(hdr + 1) + xfer_len, hdr->u.ret_submit.number_of_packets);
 
@@ -550,26 +570,38 @@ read_dev(devbuf_t *rbuff, BOOL swap_req_write)
 			swap_iso_descs_endian((char *)(hdr + 1) + xfer_len, hdr->u.ret_submit.number_of_packets);
 		swap_usbip_header_endian(hdr, FALSE);
 	}
-
+	//设置新的udbip_header的数据指针
 	rbuff->offhdr += (sizeof(struct usbip_header) + len_data);
 	if (rbuff->bufp == rbuff->bufc)
 		rbuff->bufmaxc = rbuff->offp;
+	//读状态切为0
 	rbuff->step_reading = 0;
 
 	return 1;
 }
-
+/*
+* 从rbuff读一个usbip_header以及相关数据，出错返回false
+* 没有读取到一个完整的报文，返回TRUE
+* 读到一个完整的完毕
+*/
 static BOOL
 read_write_dev(devbuf_t *rbuff, devbuf_t *wbuff)
 {
 	int	res;
-
+	/*
+	*
+	* 如果设备不在读取状态，就读取一个usbip_header以及相关报文
+	* 读出错返回FALSE,没有读完返回TRUE
+	* 读完,将当前一个usbip_header以及相关数据写入到wbuf的设备
+	*/
 	if (!rbuff->in_reading) {
+
 		if ((res = read_dev(rbuff, wbuff->swap_req)) < 0)
 			return FALSE;
 		if (res == 0)
 			return TRUE;
 	}
+	//
 	return write_devbuf(wbuff, rbuff);
 }
 

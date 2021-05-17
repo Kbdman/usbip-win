@@ -197,15 +197,25 @@ static BOOL get_devintf(const char* devpath,PUSB_INTERFACE_DESCRIPTOR intfinfo,U
 	dbg("get_interfaceinfo 0x%1x,0x%1x,0x%1x,0x%1x", intfinfo->bInterfaceClass,intfinfo->bInterfaceNumber,intfinfo->bInterfaceSubClass,intfinfo->bInterfaceProtocol);
 	return TRUE;
 }
+char intfbuf[1024] = {0};
 BOOL build_interface(struct usbip_usb_device* pudev, struct usbip_usb_interface* pinterface, int idx)
 {
 	USB_INTERFACE_DESCRIPTOR intf_desc;
+	int i = 0;
+	while (get_devintf(pudev->path, &intf_desc, i))
+	{
+
+		usbip_names_get_class(intfbuf, 1024, intf_desc.bInterfaceClass, intf_desc.bInterfaceSubClass, intf_desc.bInterfaceProtocol);
+		printf("interface class %s", intfbuf);
+		i++;
+	}
 	//get_devconf(pudev->path, &intf_desc, idx);
 	if (TRUE == get_devintf(pudev->path, &intf_desc, 0))
 	{
 		pinterface->bInterfaceClass = intf_desc.bInterfaceClass;
 		pinterface->bInterfaceProtocol = intf_desc.bInterfaceProtocol;
 		pinterface->bInterfaceSubClass = intf_desc.bInterfaceSubClass;
+		
 		return TRUE;
 	}
 	return FALSE;

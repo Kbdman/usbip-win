@@ -465,6 +465,7 @@ get_usbip_hdr_from_write_irp(PIRP irp)
 NTSTATUS
 stub_dispatch_write(usbip_stub_dev_t *devstub, IRP *irp)
 {
+	DBGI(DBG_GENERAL | DBG_READWRITE, "dispatch_write: hdr: %s\n");
 	struct usbip_header	*hdr;
 
 	hdr = get_usbip_hdr_from_write_irp(irp);

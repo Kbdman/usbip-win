@@ -112,6 +112,7 @@ recv_request_import(SOCKET sockfd)
 		dbg("usbip_net_send failed: devinfo");
 		return -1;
 	}
+	/*
 	if (got_intf0)
 	{
 		rc = usbip_net_send(sockfd, &intf0, sizeof(intf0));
@@ -121,6 +122,7 @@ recv_request_import(SOCKET sockfd)
 			return -1;
 		}
 	}
+	*/
 	dbg("import request busid %s: complete", req.busid);
 
 	return 0;
@@ -178,12 +180,14 @@ int recv_request_import_ex(int sockfd, struct op_import_request_ex* req)
 	if(got_intf0==TRUE)
 		pdu_udev.bNumInterfaces = 1;
 	usbip_net_pack_usb_device(1, &pdu_udev);
+
 	build_interface(&pdu_udev, &intf0, 0);
 	rc = usbip_net_send(sockfd, &pdu_udev, sizeof(pdu_udev));
 	if (rc < 0) {
 		err("usbip_net_send failed: devinfo, &%s", req->session_id);
 		return -1;
 	}
+	/*
 	if (got_intf0 == TRUE)
 	{
 		rc = usbip_net_send(sockfd, &intf0, sizeof(intf0));
@@ -193,6 +197,7 @@ int recv_request_import_ex(int sockfd, struct op_import_request_ex* req)
 			return -1;
 		}
 	}
+	*/
 	info("import request busid %s: complete, &%s", req->busid, req->session_id);
 
 	return 0;
