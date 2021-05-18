@@ -59,7 +59,13 @@ unlock_wait_dev_removal(usbip_stub_dev_t *devstub)
 	unlock_dev_removal(devstub);
 	KeWaitForSingleObject(&devstub->remove_lock.event, Executive, KernelMode, FALSE, NULL);
 }
-
+void free_dev_compatible_ids(usbip_stub_dev_t* devstub)
+{
+	if (devstub->ids_compatible == NULL)
+	{
+		ExFreePoolWithTag(devstub->ids_compatible,USBIP_STUB_POOL_TAG);
+	}
+}
 void
 remove_devlink(usbip_stub_dev_t *devstub)
 {
@@ -252,12 +258,47 @@ stub_add_device(PDRIVER_OBJECT drvobj, PDEVICE_OBJECT pdo)
 		IoDeleteDevice(devobj);
 		return STATUS_SUCCESS;
 	}
+	{
+		devstub->ids_compatible = NULL;
+		devstub->ids_compatible_length = 0;
 
+		NTSTATUS get_compatible_id_ret = IoGetDeviceProperty(pdo, DevicePropertyCompatibleIDs, 0, NULL, &(devstub->ids_compatible_length));
+		if (get_compatible_id_ret== STATUS_BUFFER_TOO_SMALL)
+		{
+			DBGI(DBG_DEV, "device CompatibleIDs size =%d\n", devstub->ids_compatible_length);
+			if (devstub->ids_compatible_length != 0)
+			{
+				devstub->ids_compatible = ExAllocatePoolWithTag(NonPagedPool, devstub->ids_compatible_length, USBIP_STUB_POOL_TAG);
+				if (devstub->ids_compatible == NULL)
+				{
+					DBGE(DBG_DISPATCH, "fail to allocate compatible ids %s\n", dbg_devstub(devstub));
+					get_compatible_id_ret=STATUS_NO_MEMORY;
+				}
+				else
+				{
+					get_compatible_id_ret = IoGetDeviceProperty(pdo, DevicePropertyCompatibleIDs, devstub->ids_compatible_length, devstub->ids_compatible, &(devstub->ids_compatible_length));
+					if (get_compatible_id_ret != STATUS_SUCCESS)
+					{
+						DBGI(DBG_DEV, "fail to get device CompatibleIDs err:%d\n", get_compatible_id_ret);
+					}
+				}
+			}
+		}
+		if (get_compatible_id_ret != STATUS_SUCCESS)
+		{
+			unlock_dev_removal(devstub); // always release acquired locks
+			free_dev_compatible_ids(devstub);
+			remove_devlink(devstub);
+			IoDeleteDevice(devobj);
+			return get_compatible_id_ret;
+		}
+	}
 	/* attach the newly created device object to the stack */
 	devstub->next_stack_dev = IoAttachDeviceToDeviceStack(devobj, pdo);
 	if (devstub->next_stack_dev == NULL) {
 		DBGE(DBG_DISPATCH, "failed to attach: %s\n", dbg_devstub(devstub));
 		unlock_dev_removal(devstub); // always release acquired locks
+		free_dev_compatible_ids(devstub);
 		remove_devlink(devstub);
 		IoDeleteDevice(devobj);
 		return STATUS_NO_SUCH_DEVICE;
@@ -268,6 +309,7 @@ stub_add_device(PDRIVER_OBJECT drvobj, PDEVICE_OBJECT pdo)
 		DBGE(DBG_DISPATCH, "add_device: failed to create USBD handle: %s: %s\n", dbg_devstub(devstub), dbg_ntstatus(status));
 		IoDetachDevice(devstub->next_stack_dev);
 		unlock_dev_removal(devstub);
+		free_dev_compatible_ids(devstub);
 		remove_devlink(devstub);
 		IoDeleteDevice(devobj);
 		return STATUS_UNSUCCESSFUL;

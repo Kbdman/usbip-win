@@ -18,7 +18,8 @@ send_reply_devlist_devices(SOCKET connfd, struct list_head *pedev_list)
 		int	rc;
 
 		edev = list_entry(p, edev_t, list);
-		BOOL got_intf0=build_interface(&edev->udev, &intf0, 0);
+
+		BOOL got_intf0=build_compatible_id(&edev->udev, &intf0);
 		if (got_intf0 == TRUE)
 		{
 			edev->udev.bNumInterfaces = 1;

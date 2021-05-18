@@ -171,6 +171,7 @@ static BOOL get_devconf(const char* devpath, PUSB_CONFIGURATION_DESCRIPTOR cfg, 
 	dbg("get_devconf config:%d, intf:%d ", cfg->iConfiguration, cfg->bNumInterfaces);
 	return TRUE;
 }
+
 static BOOL get_devintf(const char* devpath,PUSB_INTERFACE_DESCRIPTOR intfinfo,UCHAR index)
 {
 	dbg("get_interfaceinfo dev:%s idx: %d", devpath, index);
@@ -197,18 +198,9 @@ static BOOL get_devintf(const char* devpath,PUSB_INTERFACE_DESCRIPTOR intfinfo,U
 	dbg("get_interfaceinfo 0x%1x,0x%1x,0x%1x,0x%1x", intfinfo->bInterfaceClass,intfinfo->bInterfaceNumber,intfinfo->bInterfaceSubClass,intfinfo->bInterfaceProtocol);
 	return TRUE;
 }
-char intfbuf[1024] = {0};
 BOOL build_interface(struct usbip_usb_device* pudev, struct usbip_usb_interface* pinterface, int idx)
 {
 	USB_INTERFACE_DESCRIPTOR intf_desc;
-	int i = 0;
-	while (get_devintf(pudev->path, &intf_desc, i))
-	{
-
-		usbip_names_get_class(intfbuf, 1024, intf_desc.bInterfaceClass, intf_desc.bInterfaceSubClass, intf_desc.bInterfaceProtocol);
-		printf("interface class %s", intfbuf);
-		i++;
-	}
 	//get_devconf(pudev->path, &intf_desc, idx);
 	if (TRUE == get_devintf(pudev->path, &intf_desc, 0))
 	{
@@ -219,6 +211,59 @@ BOOL build_interface(struct usbip_usb_device* pudev, struct usbip_usb_interface*
 		return TRUE;
 	}
 	return FALSE;
+}
+BOOL build_compatible_id(struct usbip_usb_device* pudev, struct usbip_usb_interface* pinterface)
+{
+	pinterface->padding = 0;
+	const char* devpath = pudev->path;
+	dbg("build_compatible_id dev:%s", devpath);
+	HANDLE	hdev;
+	DWORD	len;
+	hdev = CreateFile(pudev->path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+	if (hdev == INVALID_HANDLE_VALUE) {
+		dbg("build_compatible_id: cannot open device: %s", devpath);
+		return FALSE;
+	}
+	ULONG size = 0;
+	if (!DeviceIoControl(hdev, IOCTL_USBIP_STUB_GET_COMPATIBLEIDS_SIZE, NULL, 0, &size, sizeof(ULONG), &len, NULL)) {
+		dbg("build_compatible_id: DeviceIoControl IOCTL_USBIP_STUB_GET_COMPATIBLEIDS_SIZE failed: err: 0x%lx", GetLastError());
+		CloseHandle(hdev);
+		return FALSE;
+	}
+	char* ids = malloc(size);
+	if (ids == NULL)
+	{
+		dbg("build_compatible_id: malloc failed");
+		CloseHandle(hdev);
+		return FALSE;
+	}
+	if (!DeviceIoControl(hdev, IOCTL_USBIP_STUB_GET_COMPATIBLEIDS, NULL, 0, ids, size, &len, NULL))
+	{
+		dbg("build_compatible_id: DeviceIoControl IOCTL_USBIP_STUB_GET_COMPATIBLEIDS failed: err: 0x%lx", GetLastError());
+		free(ids);
+		CloseHandle(hdev);
+		return FALSE;
+	}
+	BOOL ret = FALSE;
+	const wchar_t* p = ids;
+	while (*p != '\0' && (p - ids) < len - 1)
+	{
+		len = wcslen(p);
+		if (len != 0)
+		{
+			wprintf(L"got compatible id :%s\n", p);
+			if (swscanf(p, L"USB\\Class_%hhx&SubClass_%hhx&Prot_%hhx", &(pinterface->bInterfaceClass), &(pinterface->bInterfaceSubClass), &(pinterface->bInterfaceProtocol)) == 3)
+			{
+				ret = TRUE;
+			}
+			break;
+		}
+		p += (len + 1);
+	};
+	free(ids);
+	dump_usb_interface(pinterface);
+	CloseHandle(hdev);
+	return ret;
 }
 BOOL
 build_udev(devno_t devno, struct usbip_usb_device *pudev)

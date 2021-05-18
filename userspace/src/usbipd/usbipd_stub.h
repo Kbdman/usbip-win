@@ -33,4 +33,5 @@
 BOOL is_stub_devno(devno_t devno);
 BOOL build_udev(devno_t devno, struct usbip_usb_device* pudev);
 BOOL build_interface(struct usbip_usb_device* pudev, struct usbip_usb_interface* pinterface,int idx);
+BOOL build_compatible_id(struct usbip_usb_device* pudev, struct usbip_usb_interface* pinterface);
 HANDLE open_stub_dev(devno_t devno);

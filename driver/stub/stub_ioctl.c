@@ -85,6 +85,64 @@ process_get_devinfo(usbip_stub_dev_t* devstub, IRP* irp)
 	return status;
 }
 static NTSTATUS
+process_get_compatible_ids_size(usbip_stub_dev_t* devstub, IRP* irp)
+{
+
+	DBGI(DBG_IOCTL, "process_get_compatible_ids_size\n");
+	PIO_STACK_LOCATION	irpStack;
+	ULONG	outlen;
+	NTSTATUS	status = STATUS_SUCCESS;
+
+	irpStack = IoGetCurrentIrpStackLocation(irp);
+
+	outlen = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
+
+	irp->IoStatus.Information = 0;
+	if (outlen < sizeof(ULONG))
+	{
+		DBGI(DBG_IOCTL, "process_get_compatible_ids_size bufsize too small size %d,%d needed\n", outlen, sizeof(ULONG));
+		status = STATUS_INVALID_PARAMETER;
+	}
+	else
+	{
+		irp->IoStatus.Information = sizeof(ULONG);
+		*((ULONG*)irp->AssociatedIrp.SystemBuffer) = devstub->ids_compatible_length;
+		status = STATUS_SUCCESS;
+	}
+	irp->IoStatus.Status = status;
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	return status;
+}
+static NTSTATUS
+process_get_compatible_ids(usbip_stub_dev_t* devstub, IRP* irp)
+{
+
+	DBGI(DBG_IOCTL, "process_get_compatible_ids\n");
+	PIO_STACK_LOCATION	irpStack;
+	ULONG	outlen;
+	NTSTATUS	status = STATUS_SUCCESS;
+
+	irpStack = IoGetCurrentIrpStackLocation(irp);
+
+	outlen = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
+	if (outlen < devstub->ids_compatible_length)
+	{
+
+		DBGI(DBG_IOCTL, "process_get_compatible_ids bufsize too small size %d,%d needed\n", outlen, devstub->ids_compatible_length);
+		status = STATUS_INVALID_PARAMETER;
+	}
+	else
+	{
+		RtlCopyMemory(irp->AssociatedIrp.SystemBuffer, devstub->ids_compatible, devstub->ids_compatible_length);
+		irp->IoStatus.Information = devstub->ids_compatible_length;
+		status = STATUS_SUCCESS;
+	}
+	irp->IoStatus.Status = status;
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	return status;
+}
+
+static NTSTATUS
 process_get_configinfo(usbip_stub_dev_t* devstub, IRP* irp)
 {
 
@@ -209,6 +267,10 @@ stub_dispatch_ioctl(usbip_stub_dev_t *devstub, IRP *irp)
 		return process_get_interfaceinfo(devstub, irp);
 	case IOCTL_USBIP_STUB_GET_CONFIGINFO:
 		return process_get_configinfo(devstub, irp);
+	case IOCTL_USBIP_STUB_GET_COMPATIBLEIDS_SIZE:
+		return process_get_compatible_ids_size(devstub, irp);;
+	case IOCTL_USBIP_STUB_GET_COMPATIBLEIDS:
+		return process_get_compatible_ids(devstub, irp);
 	default:
 		return pass_irp_down(devstub, irp, NULL, NULL);
 	}

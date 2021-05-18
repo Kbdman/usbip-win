@@ -90,7 +90,7 @@ stub_dispatch_pnp(usbip_stub_dev_t *devstub, IRP *irp)
 		status = pass_irp_down(devstub, irp, NULL, NULL);
 
 		DBGI(DBG_PNP, "deleting device: %s\n", dbg_devstub(devstub));
-
+		free_dev_compatible_ids(devstub);
 		remove_devlink(devstub);
 		free_devconf(devstub->devconf);
 		devstub->devconf = NULL;
@@ -111,7 +111,6 @@ stub_dispatch_pnp(usbip_stub_dev_t *devstub, IRP *irp)
 	default:
 		break;
 	}
-
 	unlock_dev_removal(devstub);
 	return pass_irp_down(devstub, irp, NULL, NULL);
 }

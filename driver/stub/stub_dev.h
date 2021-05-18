@@ -41,6 +41,9 @@ typedef struct {
 
 	LIST_ENTRY	sres_head_done;
 	LIST_ENTRY	sres_head_pending;
+
+	ULONG ids_compatible_length;
+	PVOID ids_compatible;
 } usbip_stub_dev_t;
 
 void init_dev_removal_lock(usbip_stub_dev_t *devstub);
@@ -49,3 +52,4 @@ void unlock_dev_removal(usbip_stub_dev_t *devstub);
 void unlock_wait_dev_removal(usbip_stub_dev_t *devstub);
 
 void remove_devlink(usbip_stub_dev_t *devstub);
+void free_dev_compatible_ids(usbip_stub_dev_t* devstub);
